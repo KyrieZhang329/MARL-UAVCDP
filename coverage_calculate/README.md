@@ -1,15 +1,16 @@
-# 无人机扫描探测覆盖率代码
+# The code of calculating UAV coverage percent
 
-这是我自己写的关于这个项目的**第一份**代码
+This is the **first** code I wrote for the project.
 
-主要可以达到的作用：
+The main function this code can achieve：
 
-- 初始化设置无人机坐标  
+- initialize the imformation of UAV;  
 
-- 计算无人机距离
+- calculate the distance between two drones;
 
-- 一定步长下无人机扫描探测覆盖率的计算
+- Calculate the scanning and detection coverage rate of the unmanned aerial vehicle under a certain step length
 
-写这份代码时，本人还是大一刚入学不久的新生，水平有限，还望多多包涵和指正
+When I wrote this code, I was a freshman who had just started university life not long ago. My skills were limited, so I hope you can be understanding and offer your corrections.
+
 
 *2025.11.8*
