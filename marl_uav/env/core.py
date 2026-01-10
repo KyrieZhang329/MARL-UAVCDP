@@ -93,6 +93,7 @@ class Agent(Entity):  # properties of agent entities
         self.accumulated_fatigue = 0.0
         self.is_weak_battery = False
         self.active = True
+        self.last_action_u =None
 
     def setup_heterogeneity(self,uav_type):
         config = DRONE_CONFIGS[uav_type]
@@ -102,6 +103,7 @@ class Agent(Entity):  # properties of agent entities
         self.fric_coeff = config['fric_coeff']
         self.initial_mass = config['mass']
         self.max_sense = config['max_sense_range']
+        self.max_comm = config['max_comm_range']
         self.fov_rad = np.radians(config['fov'])
         self.reward_weight = config['reward_weight']
         self.max_endurance = config['max_endurance']
@@ -199,7 +201,7 @@ class World:  # multi-agent world
                 force_friction = -agent.state.p_vel*agent.fric_coeff
                 total_force = force_friction+force_action
                 if p_force[i] is None:
-                    p_force[i] = force_action
+                    p_force[i] = total_force
                 else:
                     p_force[i] = p_force[i] + force_action
         return p_force

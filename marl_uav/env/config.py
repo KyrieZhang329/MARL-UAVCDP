@@ -3,6 +3,11 @@ import numpy as np
 MAP_SIZE = 100.0
 GRID_SIZE = 1.0
 
+NUM_OBSTACLES = 5
+OBSTACLE_RADIUS = 3.0
+MIN_GOAL_DIST = 60.0
+GOAL_RADIUS = 5.0
+
 DRONE_CONFIGS = {
     'SCOUT':{
         'color':np.array([0.85,0.35,0.35]),

@@ -1,7 +1,8 @@
 import numpy as np
 from marl_uav.env.core import World,Agent,Landmark
-from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE
+from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE,NUM_OBSTACLES,OBSTACLE_RADIUS,MIN_GOAL_DIST,GOAL_RADIUS
 from marl_uav.env.cover_scan import GridMapScan
+
 
 class Scenario:
     def make_world(self):
@@ -9,6 +10,16 @@ class Scenario:
         world.dim_c = 2
         world.dim_p = 2
         formation = ['SCOUT','SCOUT','RELAY','EXECUTOR']
+
+        world.landmarks=[]
+        for i in range (NUM_OBSTACLES):
+            landmark = Landmark()
+            landmark.name = f'obstacle_{i}'
+            landmark.collide = True
+            landmark.movable = False
+            landmark.size = OBSTACLE_RADIUS
+            landmark.state.p_vel = np.zeros(world.dim_p)
+            world.landmarks.append(landmark)
 
         world.agents = []
         for i,uav_type in enumerate(formation):
@@ -24,29 +35,68 @@ class Scenario:
             agent.state.update_height()
             world.agents.append(agent)
 
+        world.goal_pos = np.array([40.0,40.0])
         self.scanner = GridMapScan(map_size=MAP_SIZE)
         return world
 
     def reset_world(self,world):
         self.scanner.reset()
-        for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-MAP_SIZE/2,MAP_SIZE/2,world.dim_p)
+        world.goal_pos = np.random.uniform(-MAP_SIZE/2+5,MAP_SIZE/2-5,world.dim_p)
+        while True:
+            start_center = np.random.uniform(-MAP_SIZE/2+10,MAP_SIZE/2-10,world.dim_p)
+            if np.linalg.norm(start_center-world.goal_pos)>MIN_GOAL_DIST:
+                break
+        for i,agent in enumerate(world.agents):
+            noise = np.random.uniform(-3,3,world.dim_p)
+            agent.state.p_pos = start_center+noise
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.accumulated_fatigue = 0.0
             agent.is_weak_battery = False
             agent.state.layer = np.random.uniform(0.5,2.0)
             agent.state.update_height()
+            agent.last_action_u = np.zeros(world.dim_p)
+        for landmark in world.landmarks:
+            while True:
+                pos = np.random.uniform(-MAP_SIZE/2,MAP_SIZE/2,world.dim_p)
+                if np.linalg.norm(pos-start_center)>10.0 and np.linalg.norm(pos-world.goal_pos)>10.0:
+                    landmark.state.p_pos = pos
+                    break
 
     def reward(self,world,agent):
         reward = 0
+        reward -= 0.01
         r=agent.get_sensing_radius()
         new_cells = self.scanner.update_coverage(agent.state.p_pos,r)
         reward += new_cells*1.0
+        dist_to_goal = np.linalg.norm(agent.state.p_pos-world.goal_pos)
+        reward -= 0.1*(dist_to_goal/MAP_SIZE)
+        if agent.uav_type == 'SCOUT':
+            reward += 0.05*new_cells
+        elif agent.uav_type == 'EXECUTOR':
+            reward -= 0.05*(dist_to_goal/MAP_SIZE)
+        if dist_to_goal < GOAL_RADIUS:
+            reward += 5.0
         reward *= agent.reward_weight
+
+        alignment_reward = 0.0
+        n_neighbors = 0
+        comm_consistency_reward = 0.0
+        for other in world.agents:
+            if other is not agent:
+                distance = np.linalg.norm(other.state.p_pos-agent.state.p_pos)
+                if distance<agent.max_comm:
+                    dot_prod = np.dot(agent.state.p_vel,other.state.p_vel)
+                    alignment_reward += dot_prod
+                    n_neighbors += 1
+        if n_neighbors>0:
+            reward += 0.05*(alignment_reward/n_neighbors)
+            reward += 0.01*n_neighbors
+
         if agent.is_weak_battery:
             action_mag = np.linalg.norm(agent.action.u)
             penalty = 0.01*action_mag/agent.battery_capacity
             reward -= penalty
+
         if agent.collide:
             for a in world.agents:
                 if a is agent:
@@ -55,10 +105,36 @@ class Scenario:
                 distance_z = abs(a.state.height-agent.state.height)
                 min_distance_2d = agent.size+a.size
                 min_distance_z = 2.0
+                safety_margin = 2.0
+                if distance_2d<min_distance_2d + safety_margin and distance_z<min_distance_z:
+                    penalty_field = 1.0/(distance_2d-min_distance_2d+0.1)
+                    penalty_field = np.clip(penalty_field,0.0,20.0)
+                    reward -= penalty_field*0.1
                 if distance_2d < min_distance_2d and distance_z < min_distance_z:
                     reward -= 10.0
                     if not hasattr(world,'collisions'):world.collisions=0
                     world.collisions += 1
+            for obs in world.landmarks:
+                distance = np.linalg.norm(obs.state.p_pos-agent.state.p_pos)
+                collision_distance = obs.size+agent.size
+                safe_margin_obs = 3.0
+                if distance < collision_distance+safe_margin_obs:
+                    distance_to_surface = distance- collision_distance
+                    if distance_to_surface<0:
+                        distance_to_surface +=0.001
+                    repulsion = 1.0/distance_to_surface
+                    repulsion = np.clip(repulsion,0.0,20.0)
+                    reward -= repulsion*0.2
+                if distance < collision_distance:
+                    reward -= 10.0
+                    if not hasattr(world,'collisions'):world.collisions=0
+                    world.collisions += 1
+
+        if agent.last_action_u is not None:
+            jerk = np.linalg.norm(agent.action.u-agent.last_action_u)
+            reward -= jerk*0.3
+        agent.last_action_u = agent.action.u
+
         return reward
 
     def get_comm(self, world):
@@ -73,6 +149,7 @@ class Scenario:
         return adj
 
     def observation(self,agent,world):
+        goal_rel = world.goal_pos-agent.state.p_pos
         self.state = [
             agent.state.p_vel[0]/agent.max_speed,
             agent.state.p_vel[1]/agent.max_speed,
@@ -80,6 +157,8 @@ class Scenario:
             agent.state.p_pos[1]/(MAP_SIZE/2),
             1.0 if agent.is_weak_battery else 0.0,
             agent.state.height,
+            goal_rel[0]/MAP_SIZE,
+            goal_rel[1]/MAP_SIZE,
         ]
 
         entity_pos = []
