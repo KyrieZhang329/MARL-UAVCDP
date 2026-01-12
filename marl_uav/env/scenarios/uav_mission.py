@@ -1,6 +1,6 @@
 import numpy as np
 from marl_uav.env.core import World,Agent,Landmark
-from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE,NUM_OBSTACLES,OBSTACLE_RADIUS,MIN_GOAL_DIST,GOAL_RADIUS
+from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE,NUM_OBSTACLES,OBSTACLE_RADIUS,MIN_GOAL_DIST,GOAL_RADIUS,POS_NOISE,VEL_NOISE
 from marl_uav.env.cover_scan import GridMapScan
 
 
@@ -149,12 +149,16 @@ class Scenario:
         return adj
 
     def observation(self,agent,world):
-        goal_rel = world.goal_pos-agent.state.p_pos
+        vel_noise  = VEL_NOISE
+        pos_noise = POS_NOISE
+        measured_pos = agent.state.p_pos+pos_noise
+        measured_vel = agent.state.p_vel+vel_noise
+        goal_rel = world.goal.p_pos-measured_pos
         self.state = [
-            agent.state.p_vel[0]/agent.max_speed,
-            agent.state.p_vel[1]/agent.max_speed,
-            agent.state.p_pos[0]/(MAP_SIZE/2),
-            agent.state.p_pos[1]/(MAP_SIZE/2),
+            measured_vel[0]/agent.max_speed,
+            measured_vel[1]/agent.max_speed,
+            measured_pos[0]/(MAP_SIZE/2),
+            measured_pos[1]/(MAP_SIZE/2),
             1.0 if agent.is_weak_battery else 0.0,
             agent.state.height,
             goal_rel[0]/MAP_SIZE,
@@ -163,16 +167,16 @@ class Scenario:
 
         entity_pos = []
         for entity in world.landmarks:
-            entity_pos.append(entity.state.p_pos-agent.state.p_pos)
+            entity_pos.append(entity.state.p_pos-measured_pos)
         entity_obs = np.concatenate(entity_pos) if entity_pos else np.array([])
         other_obs = []
         for other_agent in world.agents:
             if other_agent is agent:
                 continue
-            distance = np.linalg.norm(other_agent.state.p_pos-agent.state.p_pos)
+            distance = np.linalg.norm(other_agent.state.p_pos-measured_pos)
             is_visible = (distance<=agent.max_comm)
             if is_visible:
-                rel_pos = other_agent.state.p_pos-agent.state.p_pos
+                rel_pos = other_agent.state.p_pos-measured_pos
                 other_obs.extend([rel_pos[0],rel_pos[1],1.0])
             else:
                 other_obs.extend([0.0,0.0,0.0])

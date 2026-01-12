@@ -8,6 +8,9 @@ OBSTACLE_RADIUS = 3.0
 MIN_GOAL_DIST = 60.0
 GOAL_RADIUS = 5.0
 
+VEL_NOISE = np.random.normal(0,0.02,2)
+POS_NOISE = np.random.normal(0,0.05,2)
+
 DRONE_CONFIGS = {
     'SCOUT':{
         'color':np.array([0.85,0.35,0.35]),

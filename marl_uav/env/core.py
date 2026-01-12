@@ -196,9 +196,9 @@ class World:  # multi-agent world
                     if agent.u_noise
                     else 0.0
                 )
-                control_input = agent.action.u + noise
+                control_input = np.clip(agent.action.u+noise,-1.0,1.0)
                 force_action = control_input*agent.max_accel*agent.mass
-                force_friction = -agent.state.p_vel*agent.fric_coeff
+                force_friction = -np.sign(agent.state.p_vel)*(agent.state.p_vel**2)*agent.fric_coeff
                 total_force = force_friction+force_action
                 if p_force[i] is None:
                     p_force[i] = total_force
