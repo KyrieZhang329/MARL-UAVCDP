@@ -9,7 +9,7 @@ class MAPPOAgent:
         self.device = device
         self.args = args
 
-        self.actor = Actor(obs_dim,action_dim,args.hidden_size).to(device)
+        self.actor = PPOActor(obs_dim,action_dim,args.hidden_size).to(device)
         self.critic = Critic(obs_dim,num_agents,args.hidden_size,num_obs).to(device)
         self.optimizer = optim.Adam([
             {'params':self.actor.parameters(),'lr':args.learning_rate},
@@ -63,5 +63,8 @@ class MAPPOAgent:
                 nn.utils.clip_grad_norm_(self.actor.parameters(),self.args.max_grad_norm)
                 nn.utils.clip_grad_norm_(self.critic.parameters(),self.args.max_grad_norm)
                 self.optimizer.step()
+                total_v_loss += v_loss.item()
+                total_pg_loss += pg_loss.item()
 
-            return total_v_loss/(ppo_epochs*(batch_size/minibatch_size)),total_pg_loss/(ppo_epochs*(batch_size/minibatch_size))
+        num_updates = ppo_epochs*(batch_size/minibatch_size)
+        return total_v_loss/num_updates,total_pg_loss/num_updates

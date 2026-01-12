@@ -8,8 +8,8 @@ OBSTACLE_RADIUS = 3.0
 MIN_GOAL_DIST = 60.0
 GOAL_RADIUS = 5.0
 
-VEL_NOISE = np.random.normal(0,0.02,2)
-POS_NOISE = np.random.normal(0,0.05,2)
+VEL_NOISE_STD = 0.02
+POS_NOISE_STD = 0.05
 
 DRONE_CONFIGS = {
     'SCOUT':{
@@ -60,7 +60,7 @@ DRONE_CONFIGS = {
 }
 
 OBS_CONFIG = {
-    "dim_self":8,
+    "dim_self":10,
     "dim_obs_item":2,
     "dim_neigh_item":3,
 }

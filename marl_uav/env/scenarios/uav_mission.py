@@ -1,6 +1,6 @@
 import numpy as np
 from marl_uav.env.core import World,Agent,Landmark
-from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE,NUM_OBSTACLES,OBSTACLE_RADIUS,MIN_GOAL_DIST,GOAL_RADIUS,POS_NOISE,VEL_NOISE,OBS_CONFIG,NUM_OBSTACLES
+from marl_uav.env.config import DRONE_CONFIGS,MAP_SIZE,NUM_OBSTACLES,OBSTACLE_RADIUS,MIN_GOAL_DIST,GOAL_RADIUS,POS_NOISE_STD,VEL_NOISE_STD,OBS_CONFIG,NUM_OBSTACLES
 from marl_uav.env.cover_scan import GridMapScan
 
 
@@ -47,8 +47,21 @@ class Scenario:
             if np.linalg.norm(start_center-world.goal_pos)>MIN_GOAL_DIST:
                 break
         for i,agent in enumerate(world.agents):
-            noise = np.random.uniform(-3,3,world.dim_p)
-            agent.state.p_pos = start_center+noise
+            while True:
+                noise = np.random.uniform(-3, 3, world.dim_p)
+                proposed_pos = start_center+noise
+                collision = False
+                for obs in world.landmarks:
+                    if np.linalg.norm(proposed_pos-obs.state.p_pos)<=(obs.size+agent.size+0.5):
+                        collision = True
+                        break
+                for other in world.agents[:i]:
+                    if np.linalg.norm(proposed_pos-other.state.p_pos)<=(other.size+agent.size+0.5):
+                        collision = True
+                        break
+                if not collision:
+                    agent.state.p_pos = proposed_pos
+                    break
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.accumulated_fatigue = 0.0
             agent.is_weak_battery = False
@@ -87,10 +100,15 @@ class Scenario:
                 if distance<agent.max_comm:
                     dot_prod = np.dot(agent.state.p_vel,other.state.p_vel)
                     alignment_reward += dot_prod
+                    link_quality = 1.0-(distance/agent.max_comm)
+                    comm_consistency_reward += link_quality
                     n_neighbors += 1
         if n_neighbors>0:
             reward += 0.05*(alignment_reward/n_neighbors)
             reward += 0.01*n_neighbors
+            reward += 0.05*(comm_consistency_reward/n_neighbors)
+            if agent.uav_type == 'RELAY':
+                reward += 0.02 * n_neighbors
 
         if agent.is_weak_battery:
             action_mag = np.linalg.norm(agent.action.u)
@@ -119,9 +137,9 @@ class Scenario:
                 collision_distance = obs.size+agent.size
                 safe_margin_obs = 3.0
                 if distance < collision_distance+safe_margin_obs:
-                    distance_to_surface = distance- collision_distance
+                    distance_to_surface = distance-collision_distance
                     if distance_to_surface<0:
-                        distance_to_surface +=0.001
+                        distance_to_surface = 0.001
                     repulsion = 1.0/distance_to_surface
                     repulsion = np.clip(repulsion,0.0,20.0)
                     reward -= repulsion*0.2
@@ -130,12 +148,14 @@ class Scenario:
                     if not hasattr(world,'collisions'):world.collisions=0
                     world.collisions += 1
 
+        jerk_cost = 0.0
         if agent.last_action_u is not None:
             jerk = np.linalg.norm(agent.action.u-agent.last_action_u)
             reward -= jerk*0.3
+            jerk_cost = jerk if agent.last_action_u is not None else 0.0
         agent.last_action_u = agent.action.u
-
-        return reward
+        energy_cost = np.sum(np.square(agent.action.u))
+        return reward,{"energy":energy_cost,"jerk":jerk_cost}
 
     def get_comm(self, world):
         adj = np.zeros((len(world.agents), len(world.agents)))
@@ -149,20 +169,23 @@ class Scenario:
         return adj
 
     def observation(self,agent,world):
-        vel_noise  = VEL_NOISE
-        pos_noise = POS_NOISE
+        vel_noise = np.random.normal(0,VEL_NOISE_STD,world.dim_p)
+        pos_noise = np.random.normal(0,POS_NOISE_STD,world.dim_p)
         measured_pos = agent.state.p_pos+pos_noise
         measured_vel = agent.state.p_vel+vel_noise
-        goal_rel = world.goal.p_pos-measured_pos
+        goal_rel = world.goal_pos-measured_pos
+        last_u = agent.last_action_u if agent.last_action_u is not None else np.zeros(2)
         self.state = [
             measured_vel[0]/agent.max_speed,
             measured_vel[1]/agent.max_speed,
             measured_pos[0]/(MAP_SIZE/2),
             measured_pos[1]/(MAP_SIZE/2),
             1.0 if agent.is_weak_battery else 0.0,
-            agent.state.height,
+            agent.state.height/20.0,
             goal_rel[0]/MAP_SIZE,
             goal_rel[1]/MAP_SIZE,
+            last_u[0],
+            last_u[1],
         ]
 
         entity_pos = []
@@ -187,7 +210,7 @@ class Scenario:
         ])
         expected_dim =(
             OBS_CONFIG['dim_self']+
-            NUM_OBSTACLES*OBS_CONFIG['dim_obd_item']+
+            NUM_OBSTACLES*OBS_CONFIG['dim_obs_item']+
             (len(world.agents)-1)*OBS_CONFIG['dim_neigh_item']
         )
         assert len(final_obs)==expected_dim
