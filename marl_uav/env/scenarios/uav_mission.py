@@ -108,7 +108,7 @@ class Scenario:
             reward += 0.01*n_neighbors
             reward += 0.05*(comm_consistency_reward/n_neighbors)
             if agent.uav_type == 'RELAY':
-                reward += 0.02 * n_neighbors
+                reward += 0.02*n_neighbors
 
         if agent.is_weak_battery:
             action_mag = np.linalg.norm(agent.action.u)
