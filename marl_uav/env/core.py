@@ -8,8 +8,6 @@ class EntityState:  # physical/external base state of all entities
         self.p_pos = None
         # physical velocity
         self.p_vel = None
-
-
         self.layer = 0
         self.height = 0.0
 
