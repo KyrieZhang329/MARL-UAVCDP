@@ -21,7 +21,6 @@ class AgentState(
     def __init__(self):
         super().__init__()
         # communication utterance
-        self.cbf_residual = 0.0
         self.c = None
 
 
@@ -200,7 +199,6 @@ class World:  # multi-agent world
                 )
                 control_input = np.clip(agent.action.u+noise,-1.0,1.0)
                 force_action = control_input*agent.max_accel*agent.mass
-                force_action = self.cbf_safety_filter(agent,force_action)
                 force_friction = -np.sign(agent.state.p_vel)*(agent.state.p_vel**2)*agent.fric_coeff
                 total_force = force_friction+force_action
                 if p_force[i] is None:
@@ -276,41 +274,3 @@ class World:  # multi-agent world
         force_a = +force if entity_a.movable else None
         force_b = -force if entity_b.movable else None
         return [force_a, force_b]
-
-    def cbf_safety_filter(self,agent,raw_action_force):
-        safe_force = raw_action_force.copy()
-        projection_residual = 0.0
-        p = agent.state.p_pos
-        v = agent.state.p_vel
-        for obs in self.landmarks:
-            p = agent.state.p_pos
-            v = agent.state.p_vel
-            p_obs = obs.state.p_pos
-
-            rel_p = p-p_obs
-            distance = np.linalg.norm(rel_p)
-            distance_sq = distance**2
-            r_safe_sq = (obs.size+agent.size+0.5)**2
-            h = distance_sq-r_safe_sq
-            if h >5.0:
-                continue
-            h_dot = 2*np.dot(rel_p,v)
-            k1,k2 = 2.0,2.0
-            term_free = 2*np.dot(v,v)
-            term_ctrl_coeff = 2*rel_p/agent.mass
-
-            A = term_ctrl_coeff
-            b = -term_free - k1*h_dot-k2*h
-            violation = np.dot(A,safe_force)-b
-            if violation<0.0:
-                norm_A_sq = np.dot(A,A)+1e-6
-                lambda_dual = -violation/norm_A_sq
-                correction = lambda_dual*A
-                max_correction = 50.0
-                correction_norm = np.linalg.norm(correction)
-                if correction_norm>max_correction:
-                    correction = correction/correction_norm*max_correction
-                safe_force += correction
-                projection_residual += np.linalg.norm(correction)
-        agent.state.cbf_residual = projection_residual
-        return safe_force

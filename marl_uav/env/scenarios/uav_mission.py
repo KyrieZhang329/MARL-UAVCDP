@@ -166,8 +166,7 @@ class Scenario:
         return reward,{
             "energy":energy_cost,
             "jerk":jerk_cost,
-            "lambda_collision":agent.lambda_collision,
-            "cbf_res":getattr(agent,'cbf_residual',0.0)
+            "lambda_collision":agent.lambda_collision
         }
 
     def get_comm(self, world):

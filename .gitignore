@@ -1,0 +1,62 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE/editor files
+.idea/
+.vscode/
+*.iml
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build/package artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Tool caches and test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# ML training outputs
+runs/
+wandb/
+tensorboard/
+*.tfevents*
+checkpoints/
+*.ckpt
+*.pth
+*.pt
+*.onnx
+
+# Project runtime outputs
+marl_uav/results/

@@ -5,7 +5,7 @@ This is an ongoing research project. Code and experimental results are **subject
 
 ## Current progress
 
-- We have established a 2.5D heterogeneous UAV simulation environment based on the second-order integral **dynamic physics engine** and **CBF** safety filter.
+- We have established a 2.5D heterogeneous UAV simulation environment based on the second-order integral **dynamic physics engine**.
 
 - We have respectively implemented the **MAPPO** and the **MASAC** algorithm, both of which incorporated the **multi-head attention** mechanism.
 
