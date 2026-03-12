@@ -1,8 +1,6 @@
 # MARL-HeteroUAVs
 
-Code for the project: The dynamic collaborative perception and path planning of Heterogeneous UAVs  under telecommunication limitations based on MARL.  
-
-This is an ongoing research project. Code and experimental results are **subject to change**.
+Code for the project: The dynamic collaborative perception and path planning of Heterogeneous UAVs under telecommunication limitations based on MARL.  
 
 ## Current progress
 
@@ -12,7 +10,7 @@ This is an ongoing research project. Code and experimental results are **subject
 
 
 
-# Project structure
+## Project structure
 
 ```
 MARL-HeteroUAVSwarm/
